@@ -1,10 +1,11 @@
 """pytorch-example: A Flower / PyTorch app."""
 
 import torch
-from pytorch_example.task import Net, get_weights, load_data, set_weights, test, validate, train
+from pytorch_example.task import Net, get_weights, set_weights, test, validate, train
 
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, RecordSet, array_from_numpy
+from pytorch_example.task_vit_b import get_model, get_vit_params, set_vit_params, train_vit, load_vit_data, test_vit
 
 
 # Define Flower Client and client_fn
@@ -19,7 +20,7 @@ class FlowerClient(NumPyClient):
     def __init__(
         self, net, client_state: RecordSet, trainloader, valloader, local_epochs
     ):
-        self.net: Net = net
+        self.net = net
         self.client_state = client_state
         self.trainloader = trainloader
         self.valloader = valloader
@@ -37,34 +38,47 @@ class FlowerClient(NumPyClient):
         """
 
         # Apply weights from global models (the whole model is replaced)
-        set_weights(self.net, parameters)
+        # set_weights(self.net, parameters)
+        set_vit_params(self.net, parameters)
 
         # Override weights in classification layer with those this client
         # had at the end of the last fit() round it participated in
-        self._load_layer_weights_from_state()
-
-        train_loss = train(
-            self.net,
-            self.trainloader,
-            self.local_epochs,
-            lr=float(config["lr"]),
-            device=self.device,
+        # self._load_layer_weights_from_state()
+        
+        # Set optimizer
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        # Train locally
+        avg_train_loss = train_vit(
+            self.net, self.trainloader, optimizer, epochs=self.local_epochs, device=self.device
         )
+
+        # train_loss = train(
+        #     self.net,
+        #     self.trainloader,
+        #     self.local_epochs,
+        #     lr=float(config["lr"]),
+        #     device=self.device,
+        # )
         # Save classification head to context's state to use in a future fit() call
-        self._save_layer_weights_to_state()
+        # self._save_layer_weights_to_state()
 
         # Return locally-trained model and metrics
+        # return (
+        #     get_weights(self.net),
+        #     len(self.trainloader.dataset),
+        #     {"train_loss": train_loss},
+        # )
+        
+        # Return locally-finetuned part of the model
         return (
-            get_weights(self.net),
+            get_vit_params(self.net),
             len(self.trainloader.dataset),
-            {"train_loss": train_loss},
+            {"train_loss": avg_train_loss},
         )
 
     def _save_layer_weights_to_state(self):
         """Save last layer weights to state."""
-        state_dict_arrays = {}
-        for k, v in self.net.fc3.state_dict().items():
-            state_dict_arrays[k] = array_from_numpy(v.cpu().numpy())
+        state_dict_arrays = get_vit_params(self.net)
 
         # Add to recordset (replace if already exists)
         self.client_state.parameters_records[self.local_layer_name] = ParametersRecord(
@@ -82,7 +96,7 @@ class FlowerClient(NumPyClient):
             state_dict[k] = torch.from_numpy(v.numpy())
 
         # apply previously saved classification head by this client
-        self.net.fc3.load_state_dict(state_dict, strict=True)
+        self.net.heads.load_state_dict(state_dict, strict=True)
 
     def evaluate(self, parameters, config):
         """Evaluate the global model on the local validation set.
@@ -90,21 +104,22 @@ class FlowerClient(NumPyClient):
         Note the classification head is replaced with the weights this client had the
         last time it trained the model.
         """
-        set_weights(self.net, parameters)
+        # set_weights(self.net, parameters)
+        set_vit_params(self.net, parameters)
         # Override weights in classification layer with those this client
         # had at the end of the last fit() round it participated in
         self._load_layer_weights_from_state()
-        loss, accuracy = validate(self.net, self.valloader, self.device)
+        loss, accuracy = test_vit(self.net, self.valloader, self.device)
         return loss, len(self.valloader.dataset), {"accuracy": accuracy}
 
 
 def client_fn(context: Context):
     # Load model and data
-    net = Net()
+    net = get_model(43)
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
-    trainloader, valloader = load_data(partition_id, num_partitions, batch_size)
+    trainloader, valloader = load_vit_data(partition_id, num_partitions, batch_size)
     local_epochs = context.run_config["local-epochs"]
 
     # Return Client instance

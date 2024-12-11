@@ -6,6 +6,7 @@ from logging import INFO
 import torch
 import wandb
 from pytorch_example.task import Net, create_run_dir, set_weights
+from pytorch_example.task_vit_b import get_model, set_vit_params
 
 from flwr.common import logger, parameters_to_ndarrays
 from flwr.common.typing import UserConfig
@@ -70,8 +71,11 @@ class CustomFedAvg(FedAvg):
             # model and save the state dict.
             # Converts flwr.common.Parameters to ndarrays
             ndarrays = parameters_to_ndarrays(parameters)
-            model = Net()
-            set_weights(model, ndarrays)
+            
+            # model = Net()
+            model = get_model(43)
+            # set_weights(model, ndarrays)
+            set_vit_params(model, ndarrays)
             # Save the PyTorch model
             file_name = f"model_state_acc_{accuracy}_round_{round}.pth"
             torch.save(model.state_dict(), self.save_path / file_name)

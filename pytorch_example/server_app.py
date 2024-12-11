@@ -11,6 +11,7 @@ from pytorch_example.task import (
 )
 from torch.utils.data import DataLoader
 from pytorch_example.task import load_test_data
+from pytorch_example.task_vit_b import get_model, get_vit_params, set_vit_params, test_vit, load_vit_test_data
 from datasets import load_dataset
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
@@ -24,10 +25,12 @@ def gen_evaluate_fn(
 
     def evaluate(server_round, parameters_ndarrays, config):
         """Evaluate global model on centralized test set."""
-        net = Net()
-        set_weights(net, parameters_ndarrays)
+        # net = Net()
+        # set_weights(net, parameters_ndarrays)
+        net = get_model(43)
+        set_vit_params(net, parameters_ndarrays)
         net.to(device)
-        loss, accuracy = validate(net, valloader, device=device)
+        loss, accuracy = test_vit(net, valloader, device=device)
         return loss, {"centralized_accuracy": accuracy}
 
     return evaluate
@@ -62,12 +65,12 @@ def server_fn(context: Context):
     batch_size = context.run_config["batch-size"]
 
     # Initialize model parameters
-    ndarrays = get_weights(Net())
+    ndarrays = get_vit_params(get_model(43))
     parameters = ndarrays_to_parameters(ndarrays)
 
     # Prepare dataset for central evaluation
     # THE TEST DATA IS SEEN BY THE MODEL ONLY ONCE, FOR FINAL EVALUATION
-    testloader = load_test_data(batch_size=batch_size)
+    testloader = load_vit_test_data(batch_size=batch_size)
 
     # Define strategy
     strategy = CustomFedAvg(
