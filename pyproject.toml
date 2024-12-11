@@ -29,6 +29,7 @@ clientapp = "pytorch_example.client_app:app"
 num-server-rounds = 10
 fraction-fit = 0.25
 fraction-evaluate = 0.5
+batch-size = 32
 local-epochs = 1
 server-device = "cpu"
 use-wandb = true

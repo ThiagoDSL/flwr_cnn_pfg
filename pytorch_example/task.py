@@ -4,6 +4,7 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
+import time
 
 import torch
 import torch.nn as nn
@@ -28,7 +29,19 @@ from torchvision.transforms import (
 from flwr.common.typing import UserConfig
 
 FM_NORMALIZATION = ((0.1307,), (0.3081,))
-TEST_TRANSFORMS = Compose([ToTensor(), Normalize(*FM_NORMALIZATION)])
+# TEST_TRANSFORMS = Compose([ToTensor(), Normalize(*FM_NORMALIZATION)])
+TEST_TRANSFORMS = Compose(
+    [
+        Grayscale(num_output_channels=1),
+        Resize((32, 32)),
+        RandomCrop(32, padding=4),
+        RandomHorizontalFlip(),
+        RandomVerticalFlip(),
+        RandomAffine(degrees=10, shear=0.1),
+        ToTensor(),
+        Normalize(*FM_NORMALIZATION),
+    ]
+)
 TRAIN_TRANSFORMS = Compose(
     [
         Grayscale(num_output_channels=1),
@@ -75,40 +88,53 @@ class Net(nn.Module):
         self.conv3_3 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=4, padding=2)
         self.bn3_3 = nn.BatchNorm2d(128)
         self.pool3 = nn.MaxPool2d(kernel_size=2)
+        
+        # Calculate the flattened size dynamically
+        with torch.no_grad():
+            sample_input = torch.zeros(1, 1, 32, 32)  # Batch size 1, single-channel, 32x32
+            sample_output = self._forward_conv_layers(sample_input)
+            flattened_size = sample_output.view(1, -1).size(1)
 
         # self.fc1 = nn.Linear(in_features=128 * (dimensions[1] // 8) * (dimensions[2] // 8), out_features=128)
-        self.fc1 = nn.Linear(in_features=128*4*4, out_features=128)
-        self.bn_fc1 = nn.BatchNorm1d(128)
+        # self.fc1 = nn.Linear(in_features=flattened_size, out_features=128)
+        # self.bn_fc1 = nn.BatchNorm1d(128)
+        # self.dropout1 = nn.Dropout(0.7)
+
+        # self.fc2 = nn.Linear(128, 128)
+        # self.bn_fc2 = nn.BatchNorm1d(128)
+        # self.dropout2 = nn.Dropout(0.5)
+        
+        # Replace BatchNorm1d with LayerNorm
+        self.fc1 = nn.Linear(in_features=flattened_size, out_features=128)
+        self.bn_fc1 = nn.LayerNorm(128)
         self.dropout1 = nn.Dropout(0.7)
 
         self.fc2 = nn.Linear(128, 128)
-        self.bn_fc2 = nn.BatchNorm1d(128)
+        self.bn_fc2 = nn.LayerNorm(128)
         self.dropout2 = nn.Dropout(0.5)
 
         # GTSRB 43
         num_classes = 43
         self.fc3 = nn.Linear(128, num_classes)
 
-    def forward(self, x):
+    def _forward_conv_layers(self, x):
+        """Forward pass through the convolutional layers only."""
         x = self.pool1(self.bn1(F.relu(self.conv1(x))))
-
         x = self.bn2_1(F.relu(self.conv2_1(x)))
         x = self.pool2(self.bn2_2(F.relu(self.conv2_2(x))))
-
         x = self.bn3_1(F.relu(self.conv3_1(x)))
         x = self.bn3_2(F.relu(self.conv3_2(x)))
         x = self.pool3(self.bn3_3(F.relu(self.conv3_3(x))))
+        return x
 
-        x = torch.flatten(x, 1)
-
+    def forward(self, x):
+        x = self._forward_conv_layers(x)
+        x = torch.flatten(x, 1)  # Flatten
         x = self.bn_fc1(F.relu(self.fc1(x)))
         x = self.dropout1(x)
-
         x = self.bn_fc2(F.relu(self.fc2(x)))
         x = self.dropout2(x)
-
         x = self.fc3(x)
-
         return F.softmax(x, dim=1)
 
 
@@ -147,8 +173,8 @@ def validate(net, valloader, device):
     criterion = torch.nn.CrossEntropyLoss()#.to(device)
     with torch.no_grad():
         for batch in valloader:
-            images = batch["image"].to(device)
-            labels = batch["label"].to(device)
+            images = batch[0].to(device) if isinstance(batch, list) else batch["image"].to(device)
+            labels = batch[1].to(device) if isinstance(batch, list) else batch["label"].to(device)
             outputs = net(images)
             loss += criterion(outputs, labels).item()
             correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
@@ -162,8 +188,8 @@ def test(net, testloader, device):
 
     with torch.no_grad():
         for batch in testloader:
-            images = batch["image"].to(device)
-            labels = batch["label"].to(device)
+            images = batch[0].to(device)
+            labels = batch[1].to(device)
             outputs = net(images)
             correct += (torch.max(outputs, 1)[1] == labels).sum().item()
     accuracy = correct / len(testloader.dataset)
@@ -210,16 +236,16 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
             seed=42,
         )
         fds = FederatedDataset(
-            train_dataset,
-            partitioner.partition(),
+            dataset="tanganke/gtsrb",
+            partitioners={"train": partitioner},
         )
     
     partition = fds.load_partition(partition_id)
     # Divide data on each node: 80% train, 20% test
     partition_train_val = partition.train_test_split(test_size=0.1, seed=42)
 
-    train_partition = partition_train_val["train"]
-    val_partition = partition_train_val["test"]
+    train_partition = partition_train_val["train"].with_transform(apply_train_transforms)
+    val_partition = partition_train_val["test"].with_transform(apply_eval_transforms)
     
     trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
     valloader = DataLoader(val_partition, batch_size=batch_size, shuffle=True)
