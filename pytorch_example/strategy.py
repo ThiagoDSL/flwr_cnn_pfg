@@ -22,12 +22,13 @@ class CustomFedAvg(FedAvg):
     results to W&B if enabled.
     """
 
-    def __init__(self, run_config: UserConfig, use_wandb: bool, *args, **kwargs):
+    def __init__(self, run_config: UserConfig, use_wandb: bool, model_path: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Create a directory where to save results from this run
         self.save_path, self.run_dir = create_run_dir(run_config)
         self.use_wandb = use_wandb
+        self.model_path = model_path
         # Initialise W&B if set
         if use_wandb:
             self._init_wandb_project()
@@ -71,7 +72,7 @@ class CustomFedAvg(FedAvg):
             # Converts flwr.common.Parameters to ndarrays
             ndarrays = parameters_to_ndarrays(parameters)
             model = Net()
-            model.load_state_dict(torch.load("pytorch_example/traffic_sign_model.pth", weights_only=True), strict=True)
+            model.load_state_dict(torch.load(self.model_path, weights_only=True), strict=True)
             set_weights(model, ndarrays)
             # Save the PyTorch model
             file_name = f"model_state_acc_{accuracy}_round_{round}.pth"

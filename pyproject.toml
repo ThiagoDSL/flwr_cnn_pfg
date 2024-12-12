@@ -26,6 +26,9 @@ serverapp = "pytorch_example.server_app:app"
 clientapp = "pytorch_example.client_app:app"
 
 [tool.flwr.app.config]
+pre-trained-model="pytorch_example/traffic_sign_model.pth"
+train-split="train"
+global-test-split="test"
 num-server-rounds = 10
 fraction-fit = 0.25
 fraction-evaluate = 0.5

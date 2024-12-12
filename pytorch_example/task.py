@@ -223,14 +223,11 @@ def apply_eval_transforms(batch):
 fds = None  # Cache FederatedDataset
 
 
-def load_data(partition_id: int, num_partitions: int, batch_size: int):
+def load_data(partition_id: int, num_partitions: int, batch_size: int, split: str):
     """Load partition FashionMNIST data."""
     # Only initialize `FederatedDataset` once
     global fds
     if fds is None:
-        train_dataset = datasets.GTSRB(
-            root="pytorch_example/data", split="train", download=True, transform=TRAIN_TRANSFORMS
-        )
         partitioner = DirichletPartitioner(
             num_partitions=num_partitions,
             partition_by="label",
@@ -239,7 +236,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
         )
         fds = FederatedDataset(
             dataset="tanganke/gtsrb",
-            partitioners={"train": partitioner},
+            partitioners={split: partitioner},
         )
     
     partition = fds.load_partition(partition_id)
@@ -254,8 +251,8 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     return trainloader, valloader
 
 
-def load_test_data(batch_size: int):
-    dataset = load_dataset("tanganke/gtsrb", split="test")
+def load_test_data(batch_size: int, test_split: str):
+    dataset = load_dataset("tanganke/gtsrb", split=test_split)
 
     # Apply transformation
     test_dataset = []

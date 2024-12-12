@@ -99,14 +99,19 @@ class FlowerClient(NumPyClient):
 
 
 def client_fn(context: Context):
-    # Load model and data
-    net = Net()
-    net.load_state_dict(torch.load("pytorch_example/traffic_sign_model.pth", weights_only=True), strict=True)
+    # Load data and model
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
-    trainloader, valloader = load_data(partition_id, num_partitions, batch_size)
+    split = context.run_config["train-split"]
+    
+    trainloader, valloader = load_data(partition_id, num_partitions, batch_size, split=split)
     local_epochs = context.run_config["local-epochs"]
+    model_path = context.run_config["pre-trained-model"]
+    
+    # Model
+    net = Net()
+    net.load_state_dict(torch.load(model_path, weights_only=True), strict=True)
 
     # Return Client instance
     # We pass the state to persist information across

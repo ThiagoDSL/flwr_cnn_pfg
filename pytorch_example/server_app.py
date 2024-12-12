@@ -19,13 +19,14 @@ from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 def gen_evaluate_fn(
     valloader: DataLoader,
     device: torch.device,
+    model_path: str
 ):
     """Generate the function for centralized evaluation."""
 
     def evaluate(server_round, parameters_ndarrays, config):
         """Evaluate global model on centralized test set."""
         net = Net()
-        net.load_state_dict(torch.load("pytorch_example/traffic_sign_model.pth", weights_only=True), strict=True)
+        net.load_state_dict(torch.load(model_path, weights_only=True), strict=True)
         set_weights(net, parameters_ndarrays)
         net.to(device)
         loss, accuracy = validate(net, valloader, device=device)
@@ -61,26 +62,29 @@ def server_fn(context: Context):
     fraction_eval = context.run_config["fraction-evaluate"]
     server_device = context.run_config["server-device"]
     batch_size = context.run_config["batch-size"]
+    model_path = context.run_config["pre-trained-model"]
+    test_split = context.run_config["global-test-split"]
 
     # Initialize model parameters
     net = Net()
-    net.load_state_dict(torch.load("pytorch_example/traffic_sign_model.pth", weights_only=True), strict=True)
+    net.load_state_dict(torch.load(model_path, weights_only=True), strict=True)
     ndarrays = get_weights(net)
     parameters = ndarrays_to_parameters(ndarrays)
 
     # Prepare dataset for central evaluation
     # THE TEST DATA IS SEEN BY THE MODEL ONLY ONCE, FOR FINAL EVALUATION
-    testloader = load_test_data(batch_size=batch_size)
+    testloader = load_test_data(batch_size=batch_size, test_split=test_split)
 
     # Define strategy
     strategy = CustomFedAvg(
         run_config=context.run_config,
         use_wandb=context.run_config["use-wandb"],
+        model_path=model_path,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_eval,
         initial_parameters=parameters,
         on_fit_config_fn=on_fit_config,
-        evaluate_fn=gen_evaluate_fn(testloader, device=server_device),
+        evaluate_fn=gen_evaluate_fn(testloader, device=server_device, model_path=model_path),
         evaluate_metrics_aggregation_fn=weighted_average,
     )
     config = ServerConfig(num_rounds=num_rounds)
