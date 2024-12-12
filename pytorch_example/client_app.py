@@ -1,7 +1,7 @@
 """pytorch-example: A Flower / PyTorch app."""
 
 import torch
-from pytorch_example.task import Net, get_weights, load_data, set_weights, test, validate, train
+from pytorch_example.task import Net, get_weights, load_data, set_weights, validate, train
 
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, RecordSet, array_from_numpy
@@ -41,7 +41,7 @@ class FlowerClient(NumPyClient):
 
         # Override weights in classification layer with those this client
         # had at the end of the last fit() round it participated in
-        # self._load_layer_weights_from_state()
+        self._load_layer_weights_from_state()
 
         train_loss = train(
             self.net,
@@ -51,7 +51,7 @@ class FlowerClient(NumPyClient):
             device=self.device,
         )
         # Save classification head to context's state to use in a future fit() call
-        # self._save_layer_weights_to_state()
+        self._save_layer_weights_to_state()
 
         # Return locally-trained model and metrics
         return (
@@ -93,7 +93,7 @@ class FlowerClient(NumPyClient):
         set_weights(self.net, parameters)
         # Override weights in classification layer with those this client
         # had at the end of the last fit() round it participated in
-        # self._load_layer_weights_from_state()
+        self._load_layer_weights_from_state()
         loss, accuracy = validate(self.net, self.valloader, self.device)
         return loss, len(self.valloader.dataset), {"accuracy": accuracy}
 
@@ -101,6 +101,7 @@ class FlowerClient(NumPyClient):
 def client_fn(context: Context):
     # Load model and data
     net = Net()
+    net.load_state_dict(torch.load("pytorch_example/traffic_sign_model.pth", weights_only=True), strict=True)
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]

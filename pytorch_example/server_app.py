@@ -25,6 +25,7 @@ def gen_evaluate_fn(
     def evaluate(server_round, parameters_ndarrays, config):
         """Evaluate global model on centralized test set."""
         net = Net()
+        net.load_state_dict(torch.load("pytorch_example/traffic_sign_model.pth", weights_only=True), strict=True)
         set_weights(net, parameters_ndarrays)
         net.to(device)
         loss, accuracy = validate(net, valloader, device=device)
@@ -35,7 +36,7 @@ def gen_evaluate_fn(
 
 def on_fit_config(server_round: int):
     """Construct `config` that clients receive when running `fit()`"""
-    lr = 0.1
+    lr = 0.001
     # Enable a simple form of learning rate decay
     if server_round > 10:
         lr /= 2
@@ -62,7 +63,9 @@ def server_fn(context: Context):
     batch_size = context.run_config["batch-size"]
 
     # Initialize model parameters
-    ndarrays = get_weights(Net())
+    net = Net()
+    net.load_state_dict(torch.load("pytorch_example/traffic_sign_model.pth", weights_only=True), strict=True)
+    ndarrays = get_weights(net)
     parameters = ndarrays_to_parameters(ndarrays)
 
     # Prepare dataset for central evaluation

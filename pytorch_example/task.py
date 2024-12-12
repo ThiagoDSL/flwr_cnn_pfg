@@ -7,6 +7,7 @@ from pathlib import Path
 import time
 
 import torch
+from datasets import load_dataset
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
@@ -167,7 +168,7 @@ def train(net, trainloader, epochs, lr, device):
 
 def validate(net, valloader, device):
     """Validate the model on the validation set."""
-    # net.to(device)
+    net.to(device)
     net.eval()
     correct, loss = 0, 0.0
     criterion = torch.nn.CrossEntropyLoss()#.to(device)
@@ -214,8 +215,9 @@ def apply_train_transforms(batch):
 
 def apply_eval_transforms(batch):
     """Apply transforms to the partition from FederatedDataset."""
-    batch["image"] = [TEST_TRANSFORMS(img) for img in batch["image"]]
-    return batch
+    # batch["image"] = [TEST_TRANSFORMS(img) for img in batch["image"]]
+    batch["image"] = TEST_TRANSFORMS(batch["image"])
+    return {"image": batch["image"], "label": batch["label"]}
 
 
 fds = None  # Cache FederatedDataset
@@ -227,7 +229,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     global fds
     if fds is None:
         train_dataset = datasets.GTSRB(
-            root="data", split="train", download=True, transform=TRAIN_TRANSFORMS
+            root="pytorch_example/data", split="train", download=True, transform=TRAIN_TRANSFORMS
         )
         partitioner = DirichletPartitioner(
             num_partitions=num_partitions,
@@ -242,10 +244,10 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     
     partition = fds.load_partition(partition_id)
     # Divide data on each node: 80% train, 20% test
-    partition_train_val = partition.train_test_split(test_size=0.1, seed=42)
+    partition_train_val = partition.train_test_split(test_size=0.2, seed=42)
 
     train_partition = partition_train_val["train"].with_transform(apply_train_transforms)
-    val_partition = partition_train_val["test"].with_transform(apply_eval_transforms)
+    val_partition = partition_train_val["test"].with_transform(apply_train_transforms)
     
     trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
     valloader = DataLoader(val_partition, batch_size=batch_size, shuffle=True)
@@ -253,10 +255,16 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
 
 
 def load_test_data(batch_size: int):
-    test_dataset = datasets.GTSRB(
-        root="data", split="test", download=True, transform=TEST_TRANSFORMS 
-    )
+    dataset = load_dataset("tanganke/gtsrb", split="test")
+
+    # Apply transformation
+    test_dataset = []
+    for batch in dataset:
+        test_dataset.append(apply_eval_transforms(batch))
+
+    # Convert the dataset to PyTorch DataLoader
     testloader = DataLoader(test_dataset, batch_size=batch_size)
+
     return testloader
 
 

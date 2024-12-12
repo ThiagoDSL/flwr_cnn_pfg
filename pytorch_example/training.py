@@ -56,7 +56,7 @@ criterion = nn.CrossEntropyLoss()  # Use cross-entropy for multi-class classific
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # Training loop
-epochs = 10
+epochs = 25
 for epoch in range(epochs):
     model.train()  # Set model to training mode
     running_loss = 0.0
