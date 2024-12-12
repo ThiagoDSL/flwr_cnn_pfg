@@ -228,9 +228,9 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     # Only initialize `FederatedDataset` once
     global fds
     if fds is None:
-        train_dataset = datasets.GTSRB(
-            root="pytorch_example/data", split="train", download=True, transform=TRAIN_TRANSFORMS
-        )
+        # train_dataset = datasets.GTSRB(
+        #     root="pytorch_example/data", split="train", download=True, transform=TRAIN_TRANSFORMS
+        # )
         partitioner = DirichletPartitioner(
             num_partitions=num_partitions,
             partition_by="label",
@@ -238,7 +238,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
             seed=42,
         )
         fds = FederatedDataset(
-            dataset="tanganke/gtsrb",
+            dataset="kannanwisen/Indian-Traffic-Sign-Classification",
             partitioners={"train": partitioner},
         )
     
@@ -255,7 +255,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
 
 
 def load_test_data(batch_size: int):
-    dataset = load_dataset("tanganke/gtsrb", split="test")
+    dataset = load_dataset("kannanwisen/Indian-Traffic-Sign-Classification", split="train")
 
     # Apply transformation
     test_dataset = []

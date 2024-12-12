@@ -72,6 +72,10 @@ class CustomFedAvg(FedAvg):
             ndarrays = parameters_to_ndarrays(parameters)
             model = Net()
             model.load_state_dict(torch.load("pytorch_example/traffic_sign_model.pth", weights_only=True), strict=True)
+            
+            # Replace the last layer with a num_classes according to dataset
+            in_features = model.fc3.in_features
+            model.fc3 = torch.nn.Linear(in_features, 85)
             set_weights(model, ndarrays)
             # Save the PyTorch model
             file_name = f"model_state_acc_{accuracy}_round_{round}.pth"

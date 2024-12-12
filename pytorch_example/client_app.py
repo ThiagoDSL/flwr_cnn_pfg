@@ -99,9 +99,16 @@ class FlowerClient(NumPyClient):
 
 
 def client_fn(context: Context):
+    num_classes = context.run_config["num-classes"]
+    
     # Load model and data
     net = Net()
     net.load_state_dict(torch.load("pytorch_example/traffic_sign_model.pth", weights_only=True), strict=True)
+    
+    # Replace the last layer with a num_classes according to dataset
+    in_features = net.fc3.in_features
+    net.fc3 = torch.nn.Linear(in_features, num_classes)
+    
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
