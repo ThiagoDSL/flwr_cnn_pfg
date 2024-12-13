@@ -9,12 +9,12 @@ from pytorch_example.task import Net, create_run_dir, set_weights
 
 from flwr.common import logger, parameters_to_ndarrays
 from flwr.common.typing import UserConfig
-from flwr.server.strategy import FedAvg
+from flwr.server.strategy import FedAvgM
 
 PROJECT_NAME = "FLOWER-advanced-pytorch"
 
 # This simple avg will not cut for our unbalanced dataset
-class CustomFedAvg(FedAvg):
+class CustomFedAvg(FedAvgM):
     """A class that behaves like FedAvg but has extra functionality.
 
     This strategy: (1) saves results to the filesystem, (2) saves a
@@ -23,7 +23,7 @@ class CustomFedAvg(FedAvg):
     """
 
     def __init__(self, run_config: UserConfig, use_wandb: bool, model_path: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(server_momentum = 0.5,*args, **kwargs)
 
         # Create a directory where to save results from this run
         self.save_path, self.run_dir = create_run_dir(run_config)
