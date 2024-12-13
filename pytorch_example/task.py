@@ -238,7 +238,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
             seed=42,
         )
         fds = FederatedDataset(
-            dataset="kannanwisen/Indian-Traffic-Sign-Classification",
+            dataset="kuchidareo/chinese_trafficsign_dataset",
             partitioners={"train": partitioner},
         )
     
@@ -255,7 +255,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
 
 
 def load_test_data(batch_size: int):
-    dataset = load_dataset("kannanwisen/Indian-Traffic-Sign-Classification", split="train")
+    dataset = load_dataset("kuchidareo/chinese_trafficsign_dataset", split="train")
 
     # Apply transformation
     test_dataset = []

@@ -42,7 +42,7 @@ def gen_evaluate_fn(
 
 def on_fit_config(server_round: int):
     """Construct `config` that clients receive when running `fit()`"""
-    lr = 0.01
+    lr = 0.1
     # Enable a simple form of learning rate decay
     if server_round > 10:
         lr /= 2
@@ -91,6 +91,7 @@ def server_fn(context: Context):
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_eval,
         initial_parameters=parameters,
+        num_classes=num_classes,
         on_fit_config_fn=on_fit_config,
         evaluate_fn=gen_evaluate_fn(testloader, device=server_device, num_classes=num_classes),
         evaluate_metrics_aggregation_fn=weighted_average,

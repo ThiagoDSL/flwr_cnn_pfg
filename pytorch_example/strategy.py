@@ -22,12 +22,13 @@ class CustomFedAvg(FedAvg):
     results to W&B if enabled.
     """
 
-    def __init__(self, run_config: UserConfig, use_wandb: bool, *args, **kwargs):
+    def __init__(self, run_config: UserConfig, use_wandb: bool, num_classes: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Create a directory where to save results from this run
         self.save_path, self.run_dir = create_run_dir(run_config)
         self.use_wandb = use_wandb
+        self.num_classes = num_classes
         # Initialise W&B if set
         if use_wandb:
             self._init_wandb_project()
@@ -75,7 +76,7 @@ class CustomFedAvg(FedAvg):
             
             # Replace the last layer with a num_classes according to dataset
             in_features = model.fc3.in_features
-            model.fc3 = torch.nn.Linear(in_features, 85)
+            model.fc3 = torch.nn.Linear(in_features, self.num_classes)
             set_weights(model, ndarrays)
             # Save the PyTorch model
             file_name = f"model_state_acc_{accuracy}_round_{round}.pth"
